@@ -13,7 +13,10 @@ app.get("/station", async (req, res) => {
 
   try {
     // Lancer Puppeteer pour simuler la visite du site
-    const browser = await puppeteer.launch({ headless: true });
+    const browser = await puppeteer.launch({
+  headless: true,
+  args: ['--no-sandbox', '--disable-setuid-sandbox']
+});
     const page = await browser.newPage();
     await page.goto("https://velotoulouse.tisseo.fr/fr/mapping");
     await page.waitForTimeout(2000);
