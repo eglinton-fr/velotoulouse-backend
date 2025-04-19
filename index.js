@@ -20,46 +20,51 @@ app.get("/station", async (req, res) => {
     const page = await browser.newPage();
 
     let stationData = null;
+
+    // Intercepter les réponses réseau
     page.on("response", async (response) => {
       const url = response.url();
       if (
-        url.includes(`stationNumber=${stationNumber}`) &&
-        url.includes("api.cyclocity.fr")
+        url.includes("api.cyclocity.fr") &&
+        url.includes(`stationNumber=${stationNumber}`)
       ) {
         try {
           stationData = await response.json();
         } catch (err) {
-          console.error("Erreur de parsing de la réponse:", err);
+          console.error("Erreur en lisant la réponse Cyclocity:", err);
         }
       }
     });
 
+    // Désactiver le timeout pour le chargement
     await page.goto("https://velotoulouse.tisseo.fr/fr/mapping", {
-      waitUntil: "networkidle2"
+      waitUntil: "load",
+      timeout: 0
     });
 
-    // Taper dans la barre de recherche
-    await page.waitForSelector("input[placeholder='Rechercher']");
-    await page.type("input[placeholder='Rechercher']", stationNumber, { delay: 100 });
+    // Attendre le champ de recherche
+    await page.waitForSelector("input[placeholder='Rechercher']", { timeout: 10000 });
 
-    // Attendre que le résultat apparaisse (affiché dans une liste)
-    await page.waitForSelector(".v-autocomplete__content .v-list-item", {
-      timeout: 5000
-    });
+    // Entrer le numéro de la station
+    await page.type("input[placeholder='Rechercher']", stationNumber, { delay: 50 });
 
-    // Cliquer sur le premier résultat (c'est celui qu'on veut)
+    // Attendre que le résultat s'affiche
+    await page.waitForSelector(".v-autocomplete__content .v-list-item", { timeout: 10000 });
+
+    // Cliquer sur le 1er résultat (celui de la station)
     await page.click(".v-autocomplete__content .v-list-item");
 
-    // Attendre que la requête parte et la réponse revienne
-    await page.waitForTimeout(3000); // Donne un peu de temps à la requête pour se faire
+    // Laisser le temps à la requête de partir et revenir
+    await page.waitForTimeout(4000);
 
     await browser.close();
 
     if (stationData) {
       res.json(stationData);
     } else {
-      res.status(404).json({ error: "Données non trouvées, peut-être mauvais numéro" });
+      res.status(404).json({ error: "Données introuvables pour cette station." });
     }
+
   } catch (err) {
     console.error("Erreur attrapée :", err);
     res.status(500).json({ error: "Une erreur est survenue." });
