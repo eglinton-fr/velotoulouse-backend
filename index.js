@@ -1,5 +1,5 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,26 +9,31 @@ app.get('/velos', async (req, res) => {
   if (!station) return res.status(400).send({ error: 'stationNumber requis' });
 
   try {
-    const browser = await puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    const page = await browser.newPage();
-    await page.goto(`https://www.velo.toulouse.fr/station/${station}`, {
-      waitUntil: 'networkidle2'
-    });
-
-    const data = await page.evaluate(() => {
-      const dispo = document.querySelector('.disponibles strong')?.innerText;
-      const docks = document.querySelector('.borneslibres strong')?.innerText;
-      const name = document.querySelector('h2')?.innerText;
-      return { name, dispo, docks };
+    const response = await axios.get(`https://api.cyclocity.fr/contracts/toulouse/bikes?stationNumber=${station}`, {
+      headers: {
+        'accept': 'application/vnd.bikes.v4+json',
+        'accept-language': 'fr',
+        'cache-control': 'no-cache',
+        'referer': 'https://velotoulouse.tisseo.fr/',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 OPR/117.0.0.0'
+      }
     });
 
-    await browser.close();
-    res.json(data);
+    // Vérifiez si les données sont présentes dans la réponse
+    if (response.data && response.data.bikes) {
+      const bikeData = response.data.bikes[0]; // Supposons que vous voulez les données de la première station
+      const data = {
+        name: bikeData.name,
+        dispo: bikeData.available_bikes,
+        docks: bikeData.available_docks
+      };
+      res.json(data);
+    } else {
+      res.status(404).send({ error: 'Aucune donnée trouvée pour cette station' });
+    }
   } catch (err) {
     console.error(err);
-    res.status(500).send({ error: 'Erreur pendant le scrap' });
+    res.status(500).send({ error: 'Erreur pendant la récupération des données' });
   }
 });
 
