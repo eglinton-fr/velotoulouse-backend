@@ -18,23 +18,23 @@ app.get("/station", async (req, res) => {
     });
 
     const page = await browser.newPage();
-    await page.goto("https://velotoulouse.tisseo.fr/fr/mapping");
-
-    // Attendre 2 secondes avec une pause JS compatible toutes versions
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    await browser.close();
-
-    const apiRes = await fetch(`https://api.cyclocity.fr/contracts/toulouse/bikes?stationNumber=${stationNumber}`, {
-      headers: {
-        accept: "application/vnd.bikes.v4+json",
-        "content-type": "application/vnd.bikes.v4+json",
-        origin: "https://velotoulouse.tisseo.fr",
-        referer: "https://velotoulouse.tisseo.fr/"
-      }
+    await page.goto("https://velotoulouse.tisseo.fr/fr/mapping", {
+      waitUntil: 'networkidle0' // attendre que le site charge bien
     });
 
-    const data = await apiRes.json();
+    // Évaluer du JS dans le navigateur pour que ce soit la page qui appelle l'API
+    const data = await page.evaluate(async (stationNumber) => {
+      const res = await fetch(`https://api.cyclocity.fr/contracts/toulouse/bikes?stationNumber=${stationNumber}`, {
+        headers: {
+          accept: "application/vnd.bikes.v4+json",
+          "content-type": "application/vnd.bikes.v4+json"
+        }
+      });
+
+      return await res.json();
+    }, stationNumber);
+
+    await browser.close();
     res.json(data);
 
   } catch (err) {
