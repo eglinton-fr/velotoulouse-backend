@@ -14,29 +14,45 @@ app.get("/station", async (req, res) => {
   try {
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
-    await page.goto("https://velotoulouse.tisseo.fr/fr/mapping", {
-      waitUntil: 'networkidle0' // attendre que le site charge bien
+
+    // Intercepter les réponses du site
+    let stationData = null;
+    page.on("response", async (response) => {
+      const url = response.url();
+      if (
+        url.includes(`stationNumber=${stationNumber}`) &&
+        url.includes("api.cyclocity.fr")
+      ) {
+        try {
+          stationData = await response.json();
+        } catch (err) {
+          console.error("Erreur de parsing de la réponse:", err);
+        }
+      }
     });
 
-    // Évaluer du JS dans le navigateur pour que ce soit la page qui appelle l'API
-    const data = await page.evaluate(async (stationNumber) => {
-      const res = await fetch(`https://api.cyclocity.fr/contracts/toulouse/bikes?stationNumber=${stationNumber}`, {
-        headers: {
-          accept: "application/vnd.bikes.v4+json",
-          "content-type": "application/vnd.bikes.v4+json"
-        }
-      });
+    // Charger le site
+    await page.goto(`https://velotoulouse.tisseo.fr/fr/mapping`, {
+      waitUntil: "networkidle2"
+    });
 
-      return await res.json();
-    }, stationNumber);
+    // On clique sur la station depuis la page pour déclencher l’appel (facultatif)
+    // await page.click(`selector-de-la-station-${stationNumber}`)
+
+    // Attendre un peu que les requêtes se fassent
+    await new Promise((resolve) => setTimeout(resolve, 4000));
 
     await browser.close();
-    res.json(data);
 
+    if (stationData) {
+      res.json(stationData);
+    } else {
+      res.status(404).json({ error: "Station data not found in site requests" });
+    }
   } catch (err) {
     console.error("Erreur attrapée :", err);
     res.status(500).json({ error: "Une erreur est survenue." });
