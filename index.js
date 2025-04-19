@@ -36,25 +36,32 @@ app.get("/station", async (req, res) => {
       }
     });
 
-    // Désactiver le timeout pour le chargement
     await page.goto("https://velotoulouse.tisseo.fr/fr/mapping", {
       waitUntil: "load",
       timeout: 0
     });
 
-    // Attendre le champ de recherche
-    await page.waitForSelector("input[placeholder='Rechercher']", { timeout: 10000 });
-
-    // Entrer le numéro de la station
+    // Attendre la barre de recherche et taper le numéro
+    await page.waitForSelector("input[placeholder='Rechercher']", { timeout: 15000 });
     await page.type("input[placeholder='Rechercher']", stationNumber, { delay: 50 });
 
-    // Attendre que le résultat s'affiche
-    await page.waitForSelector(".v-autocomplete__content .v-list-item", { timeout: 10000 });
+    // Attendre un item contenant "N°" dans le texte
+    await page.waitForFunction(
+      () => {
+        const items = document.querySelectorAll(".v-list-item");
+        return Array.from(items).some(item => item.innerText.includes("N°"));
+      },
+      { timeout: 10000 }
+    );
 
-    // Cliquer sur le 1er résultat (celui de la station)
-    await page.click(".v-autocomplete__content .v-list-item");
+    // Cliquer sur le 1er résultat qui contient "N°"
+    await page.evaluate(() => {
+      const items = document.querySelectorAll(".v-list-item");
+      const target = Array.from(items).find(item => item.innerText.includes("N°"));
+      if (target) target.click();
+    });
 
-    // Laisser le temps à la requête de partir et revenir
+    // Attendre que la requête parte et la réponse revienne
     await page.waitForTimeout(4000);
 
     await browser.close();
