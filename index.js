@@ -6,6 +6,7 @@ const PORT = process.env.PORT || 8080;
 
 app.get("/station", async (req, res) => {
   const stationNumber = req.query.stationNumber;
+  const debug = req.query.debug === "true"; // Option de debug via query string
 
   if (!stationNumber) {
     return res.status(400).json({ error: "stationNumber is required" });
@@ -36,6 +37,7 @@ app.get("/station", async (req, res) => {
       }
     });
 
+    // Aller sur la page Velotoulouse
     await page.goto("https://velotoulouse.tisseo.fr/fr/mapping", {
       waitUntil: "load",
       timeout: 0
@@ -51,7 +53,7 @@ app.get("/station", async (req, res) => {
         const items = document.querySelectorAll(".v-list-item");
         return Array.from(items).some(item => item.innerText.includes("N°"));
       },
-      { timeout: 10000 }
+      { timeout: 30000 } // 30 secondes d’attente
     );
 
     // Cliquer sur le 1er résultat qui contient "N°"
@@ -64,6 +66,11 @@ app.get("/station", async (req, res) => {
     // Attendre que la requête parte et la réponse revienne
     await page.waitForTimeout(4000);
 
+    // Prendre une capture d'écran si en mode debug
+    if (debug) {
+      await page.screenshot({ path: 'debug.png' });
+    }
+
     await browser.close();
 
     if (stationData) {
@@ -74,6 +81,14 @@ app.get("/station", async (req, res) => {
 
   } catch (err) {
     console.error("Erreur attrapée :", err);
+
+    // Capture d'écran en cas d'erreur
+    if (debug) {
+      const pageContent = await page.content();
+      console.log(pageContent);  // Log HTML complet dans la console
+      await page.screenshot({ path: 'error_debug.png' });
+    }
+
     res.status(500).json({ error: "Une erreur est survenue." });
   }
 });
