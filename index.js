@@ -1,6 +1,7 @@
 const express = require('express');
 const fetch = require('node-fetch');
-const puppeteer = require('puppeteer-core');
+const puppeteer = require('puppeteer');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -13,7 +14,6 @@ app.get('/bike', async (req, res) => {
 
   const browser = await puppeteer.launch({
     headless: true,
-    executablePath: '/usr/bin/chromium',
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
 
@@ -47,18 +47,21 @@ app.get('/bike', async (req, res) => {
     return res.status(500).json({ error: 'Token non trouvé' });
   }
 
-  // Requête finale avec token
-  const response = await fetch(`https://api.cyclocity.fr/contracts/toulouse/bikes?stationNumber=${stationNumber}`, {
-    headers: {
-      'Content-Type': 'application/vnd.bikes.v4+json',
-      'Authorization': token
-    }
-  });
+  try {
+    const response = await fetch(`https://api.cyclocity.fr/contracts/toulouse/bikes?stationNumber=${stationNumber}`, {
+      headers: {
+        'Content-Type': 'application/vnd.bikes.v4+json',
+        'Authorization': token
+      }
+    });
 
-  const data = await response.json();
-  res.json(data);
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur lors de la récupération des données', details: err.message });
+  }
 });
 
 app.listen(PORT, () => {
-  console.log(`Serveur en écoute sur port ${PORT}`);
+  console.log(`🚲 Serveur vélo Toulouse prêt sur le port ${PORT}`);
 });
