@@ -1,98 +1,64 @@
-const express = require("express");
-const puppeteer = require("puppeteer");
-
+const express = require('express');
+const fetch = require('node-fetch');
+const puppeteer = require('puppeteer-core');
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 
-app.get("/station", async (req, res) => {
+app.get('/bike', async (req, res) => {
   const stationNumber = req.query.stationNumber;
-  const debug = req.query.debug === "true"; // Option de debug via query string
 
   if (!stationNumber) {
-    return res.status(400).json({ error: "stationNumber is required" });
+    return res.status(400).json({ error: 'stationNumber requis' });
   }
 
-  try {
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
+  const browser = await puppeteer.launch({
+    headless: true,
+    executablePath: '/usr/bin/chromium',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
 
-    const page = await browser.newPage();
+  const page = await browser.newPage();
 
-    let stationData = null;
+  let token = null;
 
-    // Intercepter les réponses réseau
-    page.on("response", async (response) => {
-      const url = response.url();
-      if (
-        url.includes("api.cyclocity.fr") &&
-        url.includes(`stationNumber=${stationNumber}`)
-      ) {
-        try {
-          stationData = await response.json();
-        } catch (err) {
-          console.error("Erreur en lisant la réponse Cyclocity:", err);
-        }
+  page.on('request', (request) => {
+    if (request.url().includes('https://api.cyclocity.fr/contracts/toulouse')) {
+      const headers = request.headers();
+      if (headers['authorization']) {
+        token = headers['authorization'];
       }
-    });
-
-    // Aller sur la page Velotoulouse
-    await page.goto("https://velotoulouse.tisseo.fr/fr/mapping", {
-      waitUntil: "load",
-      timeout: 0
-    });
-
-    // Attendre la barre de recherche et taper le numéro
-    await page.waitForSelector("input[placeholder='Rechercher']", { timeout: 15000 });
-    await page.type("input[placeholder='Rechercher']", stationNumber, { delay: 50 });
-
-    // Attendre un item contenant "N°" dans le texte
-    await page.waitForFunction(
-      () => {
-        const items = document.querySelectorAll(".v-list-item");
-        return Array.from(items).some(item => item.innerText.includes("N°"));
-      },
-      { timeout: 30000 } // 30 secondes d’attente
-    );
-
-    // Cliquer sur le 1er résultat qui contient "N°"
-    await page.evaluate(() => {
-      const items = document.querySelectorAll(".v-list-item");
-      const target = Array.from(items).find(item => item.innerText.includes("N°"));
-      if (target) target.click();
-    });
-
-    // Attendre que la requête parte et la réponse revienne
-    await page.waitForTimeout(4000);
-
-    // Prendre une capture d'écran si en mode debug
-    if (debug) {
-      await page.screenshot({ path: 'debug.png' });
     }
+  });
 
-    await browser.close();
+  await page.goto('https://velotoulouse.tisseo.fr/fr/mapping', {
+    waitUntil: 'networkidle2'
+  });
 
-    if (stationData) {
-      res.json(stationData);
-    } else {
-      res.status(404).json({ error: "Données introuvables pour cette station." });
-    }
-
-  } catch (err) {
-    console.error("Erreur attrapée :", err);
-
-    // Capture d'écran en cas d'erreur
-    if (debug) {
-      const pageContent = await page.content();
-      console.log(pageContent);  // Log HTML complet dans la console
-      await page.screenshot({ path: 'error_debug.png' });
-    }
-
-    res.status(500).json({ error: "Une erreur est survenue." });
+  // Attendre que le token soit trouvé
+  let attempts = 0;
+  while (!token && attempts < 10) {
+    await new Promise(r => setTimeout(r, 500));
+    attempts++;
   }
+
+  await browser.close();
+
+  if (!token) {
+    return res.status(500).json({ error: 'Token non trouvé' });
+  }
+
+  // Requête finale avec token
+  const response = await fetch(`https://api.cyclocity.fr/contracts/toulouse/bikes?stationNumber=${stationNumber}`, {
+    headers: {
+      'Content-Type': 'application/vnd.bikes.v4+json',
+      'Authorization': token
+    }
+  });
+
+  const data = await response.json();
+  res.json(data);
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ Serveur en ligne sur le port ${PORT}`);
+  console.log(`Serveur en écoute sur port ${PORT}`);
 });
