@@ -1,6 +1,5 @@
 FROM node:18-slim
 
-# Install dependencies for Puppeteer Chromium
 RUN apt-get update && apt-get install -y \
   chromium \
   fonts-liberation \
