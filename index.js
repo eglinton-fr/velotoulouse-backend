@@ -1,5 +1,5 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,6 +10,7 @@ app.get('/token', async (req, res) => {
   try {
     browser = await puppeteer.launch({
       headless: true,
+      executablePath: '/usr/bin/chromium-browser',
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
@@ -27,27 +28,27 @@ app.get('/token', async (req, res) => {
 
     await page.goto('https://velotoulouse.tisseo.fr/fr/mapping', { waitUntil: 'networkidle2' });
 
-    // Attendre max 5s pour le token
-    let attempts = 0;
-    while (!token && attempts < 10) {
-      await new Promise(r => setTimeout(r, 500));
-      attempts++;
+    // Attendre que le token soit intercepté
+    let tries = 0;
+    while (!token && tries < 10) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      tries++;
     }
 
     await browser.close();
 
     if (!token) {
-      return res.status(500).json({ error: 'Token introuvable' });
+      return res.status(500).json({ error: "Token introuvable" });
     }
 
-    return res.json({ token });
+    res.json({ token });
 
-  } catch (err) {
+  } catch (error) {
     if (browser) await browser.close();
-    res.status(500).json({ error: 'Erreur serveur', details: err.message });
+    res.status(500).json({ error: "Erreur serveur", details: error.message });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ Serveur lancé sur le port ${PORT}`);
+  console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
 });
