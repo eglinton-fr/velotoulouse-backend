@@ -1,5 +1,6 @@
 const express = require('express');
 const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,9 +10,10 @@ app.get('/token', async (req, res) => {
 
   try {
     browser = await puppeteer.launch({
-      headless: true,
-      executablePath: '/usr/bin/chromium-browser',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless
     });
 
     const page = await browser.newPage();
@@ -28,7 +30,6 @@ app.get('/token', async (req, res) => {
 
     await page.goto('https://velotoulouse.tisseo.fr/fr/mapping', { waitUntil: 'networkidle2' });
 
-    // Attendre que le token soit intercepté
     let tries = 0;
     while (!token && tries < 10) {
       await new Promise(resolve => setTimeout(resolve, 500));
