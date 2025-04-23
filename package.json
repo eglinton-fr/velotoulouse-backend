@@ -1,14 +1,12 @@
 {
-  "name": "velotoulouse-proxy",
+  "name": "velotoulouse-token-proxy",
   "version": "1.0.0",
-  "description": "Proxy pour récupérer les données vélo avec Puppeteer",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "puppeteer": "^21.3.8",
-    "node-fetch": "^2.6.9"
+    "puppeteer": "^21.3.8"
   }
 }
